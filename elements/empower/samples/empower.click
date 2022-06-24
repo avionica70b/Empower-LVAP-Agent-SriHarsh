@@ -82,7 +82,7 @@ kt :: KernelTap(10.0.0.1/24, BURST 500)
 ctrl :: Socket(TCP, 192.168.1.5, 4433, CLIENT true, VERBOSE true, RECONNECT_CALL el.reconnect)
     -> el :: EmpowerLVAPManager(WTP 00:0D:B9:2F:56:64,
                                 // Bridge argument is unknown - remove in testing
-                                BRIDGE_DPID 0000000db92f5664,
+                                // BRIDGE_DPID 0000000db92f5664,
                                 EBS ebs,
                                 EAUTHR eauthr,
                                 EASSOR eassor,
