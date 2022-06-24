@@ -13,6 +13,7 @@ CLICK_DECLS
 // because of copy constructors; for types with more expensive non-default
 // copy constructors this would probably be worse.
 
+// hashcode_t is a long unsigned int
 typedef size_t hashcode_t;	///< Typical type for a hashcode() value.
 
 template <typename T>

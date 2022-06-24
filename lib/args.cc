@@ -1413,6 +1413,8 @@ ElementArg::parse(const String &str, Element *&result, const ArgContext &args)
     const Element *context = args.context();
     assert(context);
 
+    // click_chatter("context element name: %s", context->declaration());
+
     result = context->router()->find(str, context);
     if (!result)
         args.error("does not name an element");
