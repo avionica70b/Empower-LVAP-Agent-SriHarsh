@@ -74,8 +74,8 @@ tee[0]
   -> eqm_0
   -> [1] sched_0;
 
-// DEV_NAME is deprecated -  DEV_NAME empower0
-kt :: KernelTap(10.0.0.1/24, BURST 500)
+// DEV_NAME is deprecated -  
+kt :: KernelTap(10.0.0.1/24, BURST 500, DEV_NAME empower0)
   -> tee;
 
 // Change IP Address to that of COntroller 
