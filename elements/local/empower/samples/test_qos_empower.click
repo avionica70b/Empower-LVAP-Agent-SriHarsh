@@ -26,8 +26,6 @@ wifi_cl :: Classifier(0/08%0c,  // data
 ers -> wifi_cl;
 
 tee :: EmpowerTee(1, EL el);
-packet_tee ::Tee();
-
 checker :: CheckIPHeader2(OFFSET 14, VERBOSE  true)
 switch_mngt :: PaintSwitch();
 
@@ -39,7 +37,7 @@ rates_default_0 :: TransmissionPolicy(MCS "2 4 11 22 12 18 24 36 48 72 96 108", 
 rates_0 :: TransmissionPolicies(DEFAULT rates_default_0); 
 
 rc_0 :: RateControl(rates_0);
-eqm_0 :: EmpowerQOSManager(EL el, RC rc_0/rate_control, IFACE_ID 0, DEBUG false);
+eqm_0 :: EmpowerQOSManager(EL el, RC rc_0/rate_control, IFACE_ID 0, DEBUG true);
 
 // change the interface
 // SNIFFER duplicate the packet from interface to inbound- true for virtual testing
@@ -48,7 +46,7 @@ eqm_0 :: EmpowerQOSManager(EL el, RC rc_0/rate_control, IFACE_ID 0, DEBUG false)
 RatedSource( DATA \<
 FF FF FF FF FF FF 88 AE DD 02 12 D3 08 00 45 B8 
 00 5B 40 7B 00 00 80 11 D4 08 82 59 A3 B5 FF FF FF FF D5 8E 3E 81 00 47 B4 0E 01 56 69 65 77 41 6C 6C 3E 30 30 30 39 30 30 30 30 34 34 72 47 76 33 4D 30 67 2F 41 70 30 6F 51 6B 42 4A 48 46 33 38 67 6B 37 48 53 66 30 79 58 2B 68 64 56 48 53 2B 57 34 53 4F 36 41 49 3D
->, LIMIT 300, STOP true, RATE 1)
+>, LIMIT 30, STOP true, RATE 1)
 //   -> RadiotapDecap()
   -> FilterPhyErr()
   -> rc_0
@@ -71,17 +69,11 @@ switch_mngt[0]
 tee[0]
   // Traffic Rules and DSCP stats
   -> checker
-  -> SetIPDSCP(56) // This is in DSCP decemal 
+  -> SetIPDSCP(48) // This is in DSCP decemal 
   -> IPPrint(TOS true) 
   -> dscpStats
   -> traffic_rules
   -> IPPrint(TOS true)
-  -> packet_tee
-
-checker[1] 
-  -> packet_tee
-
-packet_tee
   -> MarkIPHeader(14)
   -> Paint(0)
   -> eqm_0

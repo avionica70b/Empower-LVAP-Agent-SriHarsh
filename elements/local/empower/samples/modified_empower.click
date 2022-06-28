@@ -15,41 +15,52 @@ ControlSocket("TCP", 7777);
 
 ers :: EmpowerRXStats(EL el);
 
-// Traffic Rule and DSCP stats
 dscpStats :: DSCPStats();
 traffic_rules :: TrafficRules();
 
-// Data classifier might not work, then use 0/ff since IP packets contain ff at 0
-wifi_cl :: Classifier(0/08%0c,  // data
-                      0/00%0c); // mgt
+wifi_cl :: Classifier( 0/08%0c,  // original data
+                      // 0/ff, // actual data
+                      0/00%0c  // mgt
+                      // -
+                      );
 
-ers -> wifi_cl;
+ers 
+// -> IPPrint(TOS true)
+// -> Print("Before Wifi Class")
+-> wifi_cl;
 
 tee :: EmpowerTee(1, EL el);
-packet_tee ::Tee();
 
-checker :: CheckIPHeader2(OFFSET 14, VERBOSE  true)
 switch_mngt :: PaintSwitch();
 
-
-// Might have to change DEBUGFS to /dev/regmon and create a regmon folder and register-log
-// /sys/kernel/debug/ieee80211/phy0/regmon
-reg_0 :: EmpowerRegmon(EL el, IFACE_ID 0, DEBUGFS /dev/regmon );
+reg_0 :: EmpowerRegmon(EL el, IFACE_ID 0, DEBUGFS /dev/regmon);
 rates_default_0 :: TransmissionPolicy(MCS "2 4 11 22 12 18 24 36 48 72 96 108", HT_MCS "0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15");
-rates_0 :: TransmissionPolicies(DEFAULT rates_default_0); 
+rates_0 :: TransmissionPolicies(DEFAULT rates_default_0);
 
 rc_0 :: RateControl(rates_0);
-eqm_0 :: EmpowerQOSManager(EL el, RC rc_0/rate_control, IFACE_ID 0, DEBUG false);
+eqm_0 :: EmpowerQOSManager(EL el, RC rc_0/rate_control, IFACE_ID 0, DEBUG true);
 
-// change the interface
-// SNIFFER duplicate the packet from interface to inbound- true for virtual testing
-// OUTBOUND sends packets to interface, false for virtual testing
-// FromDevice(moni0, PROMISC false, OUTBOUND true, SNIFFER false, BURST 1000)
+checker :: CheckIPHeader2(OFFSET 14, VERBOSE  true)
+
+// wlp4s0
+// enp3s0
+// OUTBOUND set to false from true
+// SNIFER set to true from false
+// BURST set to 10 from 1000
+// FromDevice(enp3s0, PROMISC false, OUTBOUND false, SNIFFER true, BURST 10)
 RatedSource( DATA \<
-FF FF FF FF FF FF 88 AE DD 02 12 D3 08 00 45 B8 
+F8 FF FF FF FF FF 00 AE DD 02 12 00 08 00 45 B8 
 00 5B 40 7B 00 00 80 11 D4 08 82 59 A3 B5 FF FF FF FF D5 8E 3E 81 00 47 B4 0E 01 56 69 65 77 41 6C 6C 3E 30 30 30 39 30 30 30 30 34 34 72 47 76 33 4D 30 67 2F 41 70 30 6F 51 6B 42 4A 48 46 33 38 67 6B 37 48 53 66 30 79 58 2B 68 64 56 48 53 2B 57 34 53 4F 36 41 49 3D
->, LIMIT 300, STOP true, RATE 1)
-//   -> RadiotapDecap()
+>, LIMIT 30, STOP true, RATE 1)
+  // -> RadiotapDecap()
+  // -> Print("Packet")
+  -> checker
+  // -> DscpRandomizer()
+  -> SetIPDSCP(48) // This is in DSCP decemal 
+  -> IPPrint(TOS true) 
+  -> dscpStats
+  -> traffic_rules
+  -> IPPrint(TOS true) 
   -> FilterPhyErr()
   -> rc_0
   -> WifiDupeFilter()
@@ -59,43 +70,32 @@ FF FF FF FF FF FF 88 AE DD 02 12 D3 08 00 45 B8
 sched_0 :: PrioSched()
   -> WifiSeq()
   -> [1] rc_0 [1]
-//   -> RadiotapEncap()
-  // Change interface
-//   -> ToDevice (moni0);
-    -> Discard()
+  // -> RadiotapEncap()
+  // -> ToDevice (wlp4s0);
+  -> Discard()
 
 switch_mngt[0]
   -> Queue(50)
   -> [0] sched_0;
 
 tee[0]
-  // Traffic Rules and DSCP stats
-  -> checker
-  -> SetIPDSCP(56) // This is in DSCP decemal 
-  -> IPPrint(TOS true) 
-  -> dscpStats
-  -> traffic_rules
-  -> IPPrint(TOS true)
-  -> packet_tee
-
-checker[1] 
-  -> packet_tee
-
-packet_tee
   -> MarkIPHeader(14)
   -> Paint(0)
+  // -> checker
+  // -> IPPrint(TOS true) 
+  // -> dscpStats
+  // -> traffic_rules
+  // -> IPPrint(TOS true)
   -> eqm_0
   -> [1] sched_0;
 
-// DEV_NAME is deprecated -  DEV_NAME empower0
-// 10.0.0.1/24
-kt :: KernelTap(10.53.239.2/16, BURST 500)
+// Removed  DEV_NAME empower0 as argument since deprecated
+kt :: KernelTap(10.0.0.1/24, BURST 500,)
   -> tee;
 
-// Change IP Address to that of COntroller 
 ctrl :: Socket(TCP, 127.0.0.1, 4433, CLIENT true, VERBOSE true, RECONNECT_CALL el.reconnect)
     -> el :: EmpowerLVAPManager(WTP 00:0D:B9:5E:04:1C,
-                                // Bridge argument is unknown - remove in testing
+                                // Removed Bridge since argument is unknown
                                 // BRIDGE_DPID 0000000db92f5664,
                                 EBS ebs,
                                 EAUTHR eauthr,
@@ -106,33 +106,44 @@ ctrl :: Socket(TCP, 127.0.0.1, 4433, CLIENT true, VERBOSE true, RECONNECT_CALL e
                                 RES " 04:F0:21:09:F9:98/1/HT20",
                                 RCS " rc_0/rate_control",
                                 PERIOD 5000,
-                                DEBUGFS " /sys/kernel/debug/ieee80211/phy0/netdev:moni0/../ath9k/bssid_extra",
+                                // this is not working - chaning moni0 to enp3s0
+                                DEBUGFS " /sys/kernel/debug/ieee80211/phy0/netdev:enp3s0/../ath9k/bssid_extra",
                                 ERS ers,
                                 EQMS " eqm_0",
                                 REGMONS " reg_0",
-                                // Add DSCP stats and Traffic rule to LVAP man.
                                 DSCP dscpStats,
                                 TR traffic_rules,
                                 DEBUG true)
     -> ctrl;
 
-  mtbl :: EmpowerMulticastTable(DEBUG true);
+mtbl :: EmpowerMulticastTable(DEBUG true);
+  
+// wifi_cl [2] -> Print("wifi 3 discard") -> Discard()
 
-  wifi_cl [0]
-    -> wifi_decap :: EmpowerWifiDecap(EL el, DEBUG true)
-    -> MarkIPHeader(14)
-    -> igmp_cl :: IPClassifier(igmp, -);
+wifi_cl [0]
+  // -> Print("Wifi decap 0")
+  // -> wifi_decap :: EmpowerWifiDecap(EL el, DEBUG true)
+  -> MarkIPHeader(14)
+  // -> Print("Wifi decap 0 p[ost")
+  -> igmp_cl :: IPClassifier(igmp, -);
 
   igmp_cl[0]
     -> EmpowerIgmpMembership(EL el, MTBL mtbl, DEBUG true)
+    // -> IPPrint(TOS true)
+  // -> Print("IGMP packet")
     -> Discard();
 
   igmp_cl[1]
+  // -> Print("Normal Packet")
     -> kt;
 
-  wifi_decap [1] -> tee;
+  // wifi_decap [1] 
+  //   -> Print("Wifi Decap 1")
+  //   -> tee;
 
   wifi_cl [1]
+    // -> Print("Wifi 1")
+    // -> IPPrint(TOS true)
     -> mgt_cl :: Classifier(0/40%f0,  // probe req
                             0/b0%f0,  // auth req
                             0/00%f0,  // assoc req

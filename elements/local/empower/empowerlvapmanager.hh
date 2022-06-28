@@ -8,7 +8,6 @@ struct empower_traffic_rule_match;
 #include <click/etheraddress.hh>
 #include <click/ipaddress.hh>
 #include <click/hashtable.hh>
-#include <click/vector.hh>
 #include <clicknet/wifi.h>
 #include <click/sync.hh>
 #include "minstrel.hh"

@@ -15,21 +15,14 @@ ControlSocket("TCP", 7777);
 
 ers :: EmpowerRXStats(EL el);
 
-// Traffic Rule and DSCP stats
-dscpStats :: DSCPStats();
-traffic_rules :: TrafficRules();
-
 wifi_cl :: Classifier(0/08%0c,  // data
                       0/00%0c); // mgt
 
 ers -> wifi_cl;
 tee :: EmpowerTee(1, EL el);
-packet_tee ::Tee();
-checker :: CheckIPHeader2(OFFSET 14, VERBOSE  true)
+
 switch_mngt :: PaintSwitch();
 
-
-// Might have to change DEBUGFS to /dev/regmon and create a regmon folder and register-log
 reg_0 :: EmpowerRegmon(EL el, IFACE_ID 0, DEBUGFS /sys/kernel/debug/ieee80211/phy0/regmon);
 rates_default_0 :: TransmissionPolicy(MCS "2 4 11 22 12 18 24 36 48 72 96 108", HT_MCS "0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15");
 rates_0 :: TransmissionPolicies(DEFAULT rates_default_0);
@@ -37,9 +30,6 @@ rates_0 :: TransmissionPolicies(DEFAULT rates_default_0);
 rc_0 :: RateControl(rates_0);
 eqm_0 :: EmpowerQOSManager(EL el, RC rc_0/rate_control, IFACE_ID 0, DEBUG false);
 
-// change the interface
-// SNIFFER duplicate the packet from interface to inbound- true for virtual testing
-// OUTBOUND sends packets to interface, false for virtual testing
 FromDevice(moni0, PROMISC false, OUTBOUND true, SNIFFER false, BURST 1000)
   -> RadiotapDecap()
   -> FilterPhyErr()
@@ -52,7 +42,6 @@ sched_0 :: PrioSched()
   -> WifiSeq()
   -> [1] rc_0 [1]
   -> RadiotapEncap()
-  // Change interface
   -> ToDevice (moni0);
 
 switch_mngt[0]
@@ -60,32 +49,17 @@ switch_mngt[0]
   -> [0] sched_0;
 
 tee[0]
-  // Traffic Rules and DSCP stats
-  -> checker
-  // -> IPPrint(TOS true) 
-  -> dscpStats
-  -> traffic_rules
-  // -> IPPrint(TOS true)
-  -> packet_tee
-
-checker[1] 
-  -> packet_tee
-
-packet_tee
   -> MarkIPHeader(14)
   -> Paint(0)
   -> eqm_0
   -> [1] sched_0;
 
-// DEV_NAME is deprecated -  
 kt :: KernelTap(10.0.0.1/24, BURST 500, DEV_NAME empower0)
   -> tee;
 
-// Change IP Address to that of COntroller 
 ctrl :: Socket(TCP, 192.168.1.5, 4433, CLIENT true, VERBOSE true, RECONNECT_CALL el.reconnect)
     -> el :: EmpowerLVAPManager(WTP 00:0D:B9:2F:56:64,
-                                // Bridge argument is unknown - remove in testing
-                                // BRIDGE_DPID 0000000db92f5664,
+                                BRIDGE_DPID 0000000db92f5664,
                                 EBS ebs,
                                 EAUTHR eauthr,
                                 EASSOR eassor,
@@ -99,9 +73,6 @@ ctrl :: Socket(TCP, 192.168.1.5, 4433, CLIENT true, VERBOSE true, RECONNECT_CALL
                                 ERS ers,
                                 EQMS " eqm_0",
                                 REGMONS " reg_0",
-                                // Add DSCP stats and Traffic rule to LVAP man.
-                                DSCP dscpStats,
-                                TR traffic_rules,
                                 DEBUG false)
     -> ctrl;
 

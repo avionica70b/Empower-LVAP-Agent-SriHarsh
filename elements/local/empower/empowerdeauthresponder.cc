@@ -90,10 +90,10 @@ void EmpowerDeAuthResponder::push(int, Packet *p) {
 
     //If we're not aware of this LVAP, ignore
 	if (!ess) {
-		// click_chatter("%{element} :: %s :: Unknown station %s",
-		// 		      this,
-		// 		      __func__,
-		// 		      src.unparse().c_str());
+		click_chatter("%{element} :: %s :: Unknown station %s",
+				      this,
+				      __func__,
+				      src.unparse().c_str());
 		p->kill();
 		return;
 	}
