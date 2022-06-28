@@ -16,8 +16,8 @@ ControlSocket("TCP", 7777);
 ers :: EmpowerRXStats(EL el);
 
 // Traffic Rule and DSCP stats
-// dscpStats :: DSCPStats();
-// traffic_rules :: TrafficRules();
+dscpStats :: DSCPStats();
+traffic_rules :: TrafficRules();
 
 // Data classifier might not work, then use 0/ff since IP packets contain ff at 0
 wifi_cl :: Classifier(0/08%0c,  // data
@@ -48,7 +48,6 @@ FF FF FF FF FF FF 88 AE DD 02 12 D3 08 00 45 B8
 00 5B 40 7B 00 00 80 11 D4 08 82 59 A3 B5 FF FF FF FF D5 8E 3E 81 00 47 B4 0E 01 56 69 65 77 41 6C 6C 3E 30 30 30 39 30 30 30 30 34 34 72 47 76 33 4D 30 67 2F 41 70 30 6F 51 6B 42 4A 48 46 33 38 67 6B 37 48 53 66 30 79 58 2B 68 64 56 48 53 2B 57 34 53 4F 36 41 49 3D
 >, LIMIT 30, STOP true, RATE 1)
 //   -> RadiotapDecap()
-  -> SetIPDSCP(48) // This is in DSCP decemal 
   -> FilterPhyErr()
   -> rc_0
   -> WifiDupeFilter()
@@ -70,9 +69,10 @@ switch_mngt[0]
 tee[0]
   // Traffic Rules and DSCP stats
   -> checker
+  -> SetIPDSCP(48) // This is in DSCP decemal 
   -> IPPrint(TOS true) 
-//   -> dscpStats
-//   -> traffic_rules
+  -> dscpStats
+  -> traffic_rules
   -> IPPrint(TOS true)
   -> MarkIPHeader(14)
   -> Paint(0)
@@ -86,7 +86,7 @@ kt :: KernelTap(10.53.239.2/16, BURST 500)
 
 // Change IP Address to that of COntroller 
 ctrl :: Socket(TCP, 127.0.0.1, 4433, CLIENT true, VERBOSE true, RECONNECT_CALL el.reconnect)
-    -> el :: EmpowerLVAPManager(WTP 00:0D:B9:2F:56:64,
+    -> el :: EmpowerLVAPManager(WTP 00:0D:B9:5E:04:1C,
                                 // Bridge argument is unknown - remove in testing
                                 // BRIDGE_DPID 0000000db92f5664,
                                 EBS ebs,
@@ -103,8 +103,8 @@ ctrl :: Socket(TCP, 127.0.0.1, 4433, CLIENT true, VERBOSE true, RECONNECT_CALL e
                                 EQMS " eqm_0",
                                 REGMONS " reg_0",
                                 // Add DSCP stats and Traffic rule to LVAP man.
-                                // DSCP dscpStats,
-                                // TR traffic_rules,
+                                DSCP dscpStats,
+                                TR traffic_rules,
                                 DEBUG true)
     -> ctrl;
 

@@ -34,11 +34,15 @@
 #include "empowerrxstats.hh"
 #include "empowerqosmanager.hh"
 #include "empowerregmon.hh"
+#include "dscpstats.hh"
+#include "trafficrules.hh"
+
 CLICK_DECLS
 
 EmpowerLVAPManager::EmpowerLVAPManager() : _period(2000), _timer(this), _e11k(0), _ebs(0), _eauthr(0), _eassor(0),
 										   _edeauthr(0), _ers(0), _mtbl(0), _seq(0), _debug(false)
 {
+	click_chatter("LVAP constructor");
 }
 
 EmpowerLVAPManager::~EmpowerLVAPManager()
@@ -69,6 +73,8 @@ void cp_slashvec(const String &str, Vector<String> &conf)
 int EmpowerLVAPManager::configure(Vector<String> &conf,
 								  ErrorHandler *errh)
 {
+	click_chatter("LVAP configuration start");
+
 
 	int res = 0;
 	String debugfs_strings;
@@ -77,34 +83,37 @@ int EmpowerLVAPManager::configure(Vector<String> &conf,
 	String eqms_strings;
 	String regmon_strings;
 
-	res = Args(conf, this, errh).read_m("WTP", _wtp)
-						    .read_m("E11K", ElementCastArg("Empower11k"), _e11k)
-						    .read_m("EBS", ElementCastArg("EmpowerBeaconSource"), _ebs)
-			          .read_m("EAUTHR", ElementCastArg("EmpowerOpenAuthResponder"), _eauthr)
-			          .read_m("EASSOR", ElementCastArg(" self.stats:
-#self.stats[ociationResponder "), _eassor)
-								.read_m("EDEAUTHR", ElementCastArg("EmpowerDeAuthResponder"), _edeauthr)
-			          .read_m("DEBUGFS", debugfs_strings)
-			          .read_m("EQMS", eqms_strings)
-			          .read_m("RCS", rcs_strings)
-			          .read_m("RES", res_strings)
-			          .read_m("ERS", ElementCastArg("EmpowerRXStats"), _ers)
-			          .read("REGMONS", regmon_strings)
-								.read("MTBL", ElementCastArg("EmpowerMulticastTable"), _mtbl)
-				  			.read("PERIOD", _period)
-			          .read("DEBUG", _debug)
-			          .complete();
-
+	res = Args(conf, this, errh)
+			  .read_m("WTP", _wtp)
+			  .read_m("E11K", ElementCastArg("Empower11k"), _e11k)
+			  .read_m("EBS", ElementCastArg("EmpowerBeaconSource"), _ebs)
+			  .read_m("EAUTHR", ElementCastArg("EmpowerOpenAuthResponder"), _eauthr)
+			  .read_m("EASSOR", ElementCastArg("EmpowerAssociationResponder"), _eassor)
+			  .read_m("EDEAUTHR", ElementCastArg("EmpowerDeAuthResponder"), _edeauthr)
+			  .read_m("DEBUGFS", debugfs_strings)
+			  .read_m("EQMS", eqms_strings)
+			  .read_m("DSCP", ElementCastArg("DSCPStats"), _dscpStats)
+			  .read_m("TR", ElementCastArg("TrafficRules"), _tr)
+			  .read_m("RCS", rcs_strings)
+			  .read_m("RES", res_strings)
+			  .read_m("ERS", ElementCastArg("EmpowerRXStats"), _ers)
+			  .read("REGMONS", regmon_strings)
+			  .read("MTBL", ElementCastArg("EmpowerMulticastTable"), _mtbl)
+			  .read("PERIOD", _period)
+			  .read("DEBUG", _debug)
+			  .complete();
 	cp_spacevec(debugfs_strings, _debugfs_strings);
 
-	for (int i = 0; i < _debugfs_strings.size(); i++) {
+	for (int i = 0; i < _debugfs_strings.size(); i++)
+	{
 		_masks.push_back(EtherAddress::make_broadcast());
 	}
 
 	Vector<String> tokens;
 	cp_spacevec(rcs_strings, tokens);
 
-	for (int i = 0; i < tokens.size(); i++) {
+	for (int i = 0; i < tokens.size(); i++)
+	{
 		Minstrel *rc;
 		if (!ElementCastArg("Minstrel").parse(tokens[i], rc, Args(conf, this, errh)))
 		{
@@ -113,14 +122,17 @@ int EmpowerLVAPManager::configure(Vector<String> &conf,
 		_rcs.push_back(rc);
 	}
 
-	if (_rcs.size() != _masks.size()) {
+	if (_rcs.size() != _masks.size())
+	{
 		return errh->error("rcs has %u values, while masks has %u values", _rcs.size(), _masks.size());
 	}
 
 	tokens.clear();
 	cp_spacevec(res_strings, tokens);
 
-	for (int x = 0; x < tokens.size(); x++) {
+	for (int x = 0; x < tokens.size(); x++)
+	{
+
 		Vector<String> tokens_re;
 
 		cp_slashvec(tokens[x], tokens_re);
@@ -150,13 +162,13 @@ int EmpowerLVAPManager::configure(Vector<String> &conf,
 
 		ResourceElement *elm = new ResourceElement(x, hwaddr, channel, band);
 		_ifaces.set(x, elm);
-
 	}
 
 	tokens.clear();
 	cp_spacevec(eqms_strings, tokens);
 
-	for (int i = 0; i < tokens.size(); i++) {
+	for (int i = 0; i < tokens.size(); i++)
+	{
 		EmpowerQOSManager *eqm;
 		if (!ElementCastArg("EmpowerQOSManager").parse(tokens[i], eqm, Args(conf, this, errh)))
 		{
@@ -165,13 +177,15 @@ int EmpowerLVAPManager::configure(Vector<String> &conf,
 		_eqms.push_back(eqm);
 	}
 
-	if (_eqms.size() != _masks.size()) {
+	if (_eqms.size() != _masks.size())
+	{
 		return errh->error("eqms has %u values, while masks has %u values", _eqms.size(), _masks.size());
 	}
 
 	tokens.clear();
 	cp_spacevec(regmon_strings, tokens);
-	for (int i = 0; i < tokens.size(); i++) {
+	for (int i = 0; i < tokens.size(); i++)
+	{
 		EmpowerRegmon *regmon;
 		if (!ElementCastArg("EmpowerRegmon").parse(tokens[i], regmon, Args(conf, this, errh)))
 		{
@@ -180,9 +194,12 @@ int EmpowerLVAPManager::configure(Vector<String> &conf,
 		_regmons.push_back(regmon);
 	}
 
-	if (_regmons.size() != _masks.size()) {
+	if (_regmons.size() != _masks.size())
+	{
 		return errh->error("regmons has %u values, while masks has %u values", _regmons.size(), _masks.size());
 	}
+	click_chatter("LVAP configuration end");
+
 
 	return res;
 }
@@ -416,6 +433,32 @@ int EmpowerLVAPManager::handle_slice_status_request(Packet *, uint32_t)
 	return 0;
 }
 
+int EmpowerLVAPManager::handle_dscp_stats_request(Packet *p, uint32_t offset)
+{
+	click_chatter("recevied the response for dscp stats");
+	empower_dscp_stats_request *q = (empower_dscp_stats_request *)(p->data() + offset);
+	String ssid = q->ssid();
+	send_dscp_stats_response(ssid, q->xid());
+	return 0;
+}
+
+int EmpowerLVAPManager::handle_traffic_rules_response(Packet *p, uint32_t offset)
+{
+	click_chatter("recevied the response for traffic rules with offset %d", offset);
+	empower_traffic_rules_response *q = (empower_traffic_rules_response *)(p->data() + offset);
+	if (!q)
+	{
+		click_chatter("%{element} :: %s :: cannot make packet!",
+					  this,
+					  __func__);
+		return 0;
+	}
+	uint8_t dscp = q->get_dscp();
+	empower_traffic_rule_match match = q->get_match();
+	send_traffic_rules_response(dscp, match);
+	return 0;
+}
+
 int EmpowerLVAPManager::handle_port_status_request(Packet *, uint32_t)
 {
 
@@ -431,12 +474,26 @@ int EmpowerLVAPManager::handle_port_status_request(Packet *, uint32_t)
 	return 0;
 }
 
-void EmpowerLVAPManager::send_slice_stats_response(String ssid, uint8_t dscp, uint32_t xid)
+
+void EmpowerLVAPManager::send_traffic_rules_response(uint8_t dscp, empower_traffic_rule_match match)
 {
+	_tr->add_traffic_rule(dscp, match);
+}
+
+void EmpowerLVAPManager::send_dscp_stats_response(String ssid, uint32_t xid)
+{
+	// click_chatter("Making the DSCP stats response");
+
+	uint8_t dscpStatSize = _dscpStats->statsSize();
+	uint8_t dscpMapSize = _dscpStats->mapSize();
+
+	// click_chatter("map size is : %d", dscpMapSize);
+
+	int dscpStatBodySize = dscpStatSize * sizeof(empower_dscp_stats_entry);
+	int dscpMapBodySize = dscpMapSize * sizeof(empower_dscp_map_entry);
 
 	// Calculate the packet length.
-	// In this case, it is the size of the header + the size of the entry * the number of slices.
-	int len = sizeof(empower_slice_stats_response) + _eqms.size() * sizeof(empower_slice_stats_entry);
+	int len = sizeof(empower_dscp_stats_response) + dscpStatBodySize + dscpMapBodySize;
 
 	// Make a packet of that length.
 	WritablePacket *p = Packet::make(len);
@@ -453,6 +510,94 @@ void EmpowerLVAPManager::send_slice_stats_response(String ssid, uint8_t dscp, ui
 	memset(p->data(), 0, p->length());
 
 	// Fill the header of the packet with the necessary information.
+	empower_dscp_stats_response *stats = (empower_dscp_stats_response *)(p->data());
+	stats->set_version(_empower_version);
+	stats->set_length(len);
+	stats->set_type(EMPOWER_PT_DSCP_STATS_RESPONSE);
+	stats->set_seq(get_next_seq());
+	stats->set_xid(xid);
+	stats->set_wtp(_wtp);
+	stats->set_nb_entries(dscpStatSize);
+	stats->set_dscp_map_count(dscpMapSize);
+
+	// Pointer ptr is going to be used to iterate and fill the packet.
+	uint8_t *ptr = (uint8_t *)stats;
+	// Get the pointer to the end of the header.
+	ptr += sizeof(empower_dscp_stats_response);
+
+	// Calculate the end of the packet by taking the total length, subtracting the header size and adding that to the pointer.
+	uint8_t *statsEnd = ptr + (len - sizeof(empower_dscp_stats_response) - dscpMapBodySize);
+
+	Vector<DSCPStat> dscpStats = _dscpStats->getStats();
+	// Loop through all DSCP values
+	for (int i = 0; i < dscpStatSize; i++)
+	{
+
+		assert(ptr <= statsEnd);
+
+		DSCPStat stat = dscpStats.at(i);
+
+		// Make the entry pointer from the current ptr location.
+		empower_dscp_stats_entry *entry = (empower_dscp_stats_entry *)ptr;
+		entry->set_src_ip(stat.src_ip);
+		entry->set_dst_ip(stat.dst_ip);
+		entry->set_src_port(stat.src_port);
+		entry->set_dst_port(stat.dst_port);
+		entry->set_protocol(stat.protocol);
+		entry->set_dscp(stat.dscp);
+
+		// Update the position of the ptr by the size of the entry header/body.
+		ptr += sizeof(empower_dscp_stats_entry);
+	}
+
+	uint8_t *mapEnd = ptr + (len - (sizeof(empower_dscp_stats_response) + dscpStatBodySize));
+
+	HashMap<uint8_t, uint32_t> dscpMap = _dscpStats->getDSCPMap();
+	_dscpStats->printDSCPMap();
+
+	// Loop through all DSCP values
+	for (HashMap<uint8_t, uint32_t>::iterator it = dscpMap.begin(); it.live(); it++)
+	{
+		assert(ptr <= mapEnd);
+
+		empower_dscp_map_entry *entry = (empower_dscp_map_entry *)ptr;
+
+		// click_chatter("dscp_code: %d -> %d", it.key(), it.value());
+		uint8_t dscp_code = it.key();
+		uint32_t count = it.value();
+		uint32_t length = _dscpStats->get_packes_length(dscp_code);
+		uint32_t average_size = length/count;
+
+		entry->set_dscp_code(dscp_code);
+		entry->set_count(count);
+		entry->set_avg_packet_size(average_size);
+
+		ptr += sizeof(empower_dscp_map_entry);
+	}
+	// Clear the stats for next time
+	_dscpStats->clearStats();
+	// click_chatter("Sendin the DSCP stats response");
+	// Pushes the packet to the socket which is the controller.
+	send_message(p);
+}
+
+void EmpowerLVAPManager::send_slice_stats_response(String ssid, uint8_t dscp, uint32_t xid)
+{
+
+	int len = sizeof(empower_slice_stats_response) + _eqms.size() * sizeof(empower_slice_stats_entry);
+
+	WritablePacket *p = Packet::make(len);
+
+	if (!p)
+	{
+		click_chatter("%{element} :: %s :: cannot make packet!",
+					  this,
+					  __func__);
+		return;
+	}
+
+	memset(p->data(), 0, p->length());
+
 	empower_slice_stats_response *stats = (empower_slice_stats_response *)(p->data());
 	stats->set_version(_empower_version);
 	stats->set_length(len);
@@ -462,33 +607,24 @@ void EmpowerLVAPManager::send_slice_stats_response(String ssid, uint8_t dscp, ui
 	stats->set_wtp(_wtp);
 	stats->set_nb_entries(_eqms.size());
 
-	// Pointer ptr is going to be used to iterate and fill the packet.
 	uint8_t *ptr = (uint8_t *)stats;
-	// Get the pointer to the end of the header.
 	ptr += sizeof(empower_slice_stats_response);
 
-	// Calculate the end of the packet by taking the total length, subtracting the header size and adding that to the pointer.
 	uint8_t *end = ptr + (len - sizeof(empower_slice_stats_response));
 
-	// Make the slice who's stats are needed.
 	Slice slice = Slice(ssid, dscp);
 
-	// Loop through every QoS Manager on the WTP to find the slice.
 	for (int i = 0; i < _eqms.size(); i++)
 	{
 
 		assert(ptr <= end);
 
-		// Make the entry pointer from the current ptr location.
 		empower_slice_stats_entry *entry = (empower_slice_stats_entry *)ptr;
 
-		// Find the slice in the current QoS Manager.
 		SIter itr = _eqms[i]->slices()->find(slice);
 
-		// Set the interface id as the index.
 		entry->set_iface_id(i);
 
-		// Check if the slice was found in the QoS Manager.
 		if (itr != _eqms[i]->slices()->end())
 		{
 			entry->set_deficit_used(itr.value()->_deficit_used);
@@ -504,11 +640,9 @@ void EmpowerLVAPManager::send_slice_stats_response(String ssid, uint8_t dscp, ui
 			entry->set_tx_packets(0);
 		}
 
-		// Update the position of the ptr by the size of the entry header/body.
 		ptr += sizeof(empower_slice_stats_entry);
 	}
 
-	// Pushes the packet to the socket which is the controller.
 	send_message(p);
 }
 
@@ -1696,7 +1830,7 @@ int EmpowerLVAPManager::handle_lvap_stats_request(Packet *p, uint32_t offset)
 
 int EmpowerLVAPManager::handle_set_slice(Packet *p, uint32_t offset)
 {
-
+	click_chatter("in handle set slice");
 	empower_set_slice *add_slice = (empower_set_slice *)(p->data() + offset);
 
 	int iface_id = add_slice->iface_id();
@@ -1706,6 +1840,7 @@ int EmpowerLVAPManager::handle_set_slice(Packet *p, uint32_t offset)
 	uint32_t quantum = add_slice->quantum();
 	bool amsdu_aggregation = add_slice->flags(EMPOWER_AMSDU_AGGREGATION);
 	uint8_t scheduler = add_slice->scheduler();
+	click_chatter("received a request for setting slice with dscp: %d", dscp);
 
 	_eqms[iface_id]->set_slice(ssid, dscp, quantum, amsdu_aggregation, scheduler);
 
@@ -1848,6 +1983,12 @@ void EmpowerLVAPManager::push(int, Packet *p)
 		break;
 	case EMPOWER_PT_PORT_STATUS_REQ:
 		handle_port_status_request(p, offset);
+		break;
+	case EMPOWER_PT_DSCP_STATS_REQUEST:
+		handle_dscp_stats_request(p, offset);
+		break;
+	case EMPOWER_PT_TRAFFIC_RULES_RESPONSE:
+		handle_traffic_rules_response(p, offset);
 		break;
 	default:
 		click_chatter("%{element} :: %s :: Unknown packet type: %d",

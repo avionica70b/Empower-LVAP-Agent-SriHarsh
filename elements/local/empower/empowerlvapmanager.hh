@@ -16,8 +16,8 @@ struct empower_traffic_rule_match;
 #include "empowerpacket.hh"
 #include "igmppacket.hh"
 #include "empowermulticasttable.hh"
-#include "../dscpstats/dscpstats.hh"
-#include "../trafficrules/trafficrules.hh"
+#include "dscpstats.hh"
+#include "trafficrules.hh"
 CLICK_DECLS
 
 /*

@@ -34,8 +34,8 @@
 #include "empowerrxstats.hh"
 #include "empowerqosmanager.hh"
 #include "empowerregmon.hh"
-#include "../dscpstats/dscpstats.hh"
-#include "../trafficrules/trafficrules.hh"
+#include "dscpstats.hh"
+#include "trafficrules.hh"
 
 CLICK_DECLS
 
