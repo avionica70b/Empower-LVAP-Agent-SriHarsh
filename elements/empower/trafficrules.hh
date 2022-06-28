@@ -12,7 +12,7 @@ struct empower_traffic_rule_match;
 // #include <click/router.hh>
 #include <click/error.hh>
 // #include <click/etheraddress.hh>
-#include "../empower/empowerpacket.hh"
+#include "empowerpacket.hh"
 CLICK_DECLS
 
 class TrafficRules : public Element
